@@ -37,4 +37,7 @@
 #define MAX_NR_L2CAP_CHANNELS  2
 #define MAX_NR_GATT_CLIENT_SERVER_IDS 1
 
+// Security Manager
+#define ENABLE_LE_SECURITY_MANAGER
+
 #endif

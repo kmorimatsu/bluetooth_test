@@ -61,6 +61,18 @@ static void packet_handler(uint8_t packet_type, uint16_t channel, uint8_t *packe
 				}
 			}
 			break;
+		case SM_EVENT_PASSKEY_INPUT_NUMBER: {
+			uint16_t handle = sm_event_passkey_input_number_get_handle(packet);
+			printf("Passkey Input Requested. Sending 000000...\n");
+			sm_passkey_input(handle, 000000); // 自動応答
+			break;
+		}
+		case SM_EVENT_PAIRING_COMPLETE: {
+			uint8_t status = sm_event_pairing_complete_get_status(packet);
+			if (status == 0) printf("Pairing Success!\n");
+			else printf("Pairing Failed: 0x%02x\n", status);
+			break;
+		}
 		default:
 			break;
 	}
@@ -84,5 +96,10 @@ int main() {
 	hci_event_callback_registration.callback = &packet_handler;
 	hci_add_event_handler(&hci_event_callback_registration);
 	hci_power_control(HCI_POWER_ON);
+
+	// IO能力を「キーボードあり」に設定し、パスキー入力を誘発させる
+	sm_set_io_capabilities(IO_CAPABILITY_KEYBOARD_ONLY);
+	sm_set_authentication_requirements(SM_AUTHREQ_MITM_PROTECTION | SM_AUTHREQ_BONDING);
+
 	while(1) { cyw43_arch_poll(); sleep_ms(1); }
 }

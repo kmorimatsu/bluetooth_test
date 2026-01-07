@@ -6,6 +6,7 @@
 static hci_con_handle_t connection_handle = HCI_CON_HANDLE_INVALID;
 static bool led_state = false;
 static bool trigger_send = false;
+static bool authenticated = false; // 認証完了フラグ
 
 static void packet_handler(uint8_t packet_type, uint16_t channel, uint8_t *packet, uint16_t size) {
 	if (packet_type != HCI_EVENT_PACKET) return;
@@ -37,6 +38,24 @@ static void packet_handler(uint8_t packet_type, uint16_t channel, uint8_t *packe
 			printf("Disconnected. Scanning again...\n");
 			gap_start_scan();
 			break;
+		case SM_EVENT_PASSKEY_INPUT_NUMBER: {
+			uint16_t handle = sm_event_passkey_input_number_get_handle(packet);
+			printf("Passkey Input Requested. Sending 000000...\n");
+			sm_passkey_input(handle, 000000); // サーバーと同じ値を返す
+			break;
+		}
+		case SM_EVENT_PAIRING_COMPLETE: {
+			uint8_t status = sm_event_pairing_complete_get_status(packet);
+			if (status == 0) {
+				printf("Authenticated and Paired!\n");
+				authenticated = true; // ここで通信を許可
+			} else {
+				printf("Authentication Failed: 0x%02x\n", status);
+			}
+		break;
+		}
+		default:
+			break;
 	}
 }
 
@@ -56,12 +75,15 @@ int main() {
 
 	absolute_time_t next_send_time = get_absolute_time();
 
+	sm_set_io_capabilities(IO_CAPABILITY_KEYBOARD_ONLY);
+	sm_set_authentication_requirements(SM_AUTHREQ_MITM_PROTECTION | SM_AUTHREQ_BONDING);
+
 	while(1) {
 		// BTstackの内部処理（必須）
 		cyw43_arch_poll();
 
 		// 接続中かつ、500ms経過したかチェック
-		if (connection_handle != HCI_CON_HANDLE_INVALID) {
+		if (connection_handle != HCI_CON_HANDLE_INVALID && authenticated) {
 			if (absolute_time_diff_us(get_absolute_time(), next_send_time) < 0) {
 				
 				// LEDの状態を反転
